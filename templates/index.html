@@ -309,7 +309,11 @@
 
 </main>
 
-<footer>PDF Unifier · By Stuart Rivera · Archivos temporales eliminados automáticamente · Máx. {{ max_upload_mb }} MB / {{ max_files }} archivos</footer>
+<footer>
+  PDF Unifier · By Stuart Rivera · Archivos temporales eliminados automáticamente
+  · Máx. {{ max_upload_mb }} MB / {{ max_files }} archivos
+  · Visitas: <span id="visitCount" aria-live="polite">—</span>
+</footer>
 
 <script>
   // ─── Estado ───────────────────────────────────────────────────────────────
@@ -512,6 +516,39 @@
       mergeBtn.disabled = fileList.length === 0;
     }
   }
+</script>
+
+<script
+  data-goatcounter="https://pdf-unifier-stuart.goatcounter.com/count"
+  async
+  src="https://gc.zgo.at/count.js">
+</script>
+
+<script>
+  async function loadVisitCount() {
+    const counter = document.getElementById('visitCount');
+
+    try {
+      const response = await fetch(
+        'https://pdf-unifier-stuart.goatcounter.com/counter/TOTAL.json'
+      );
+
+      if (response.status === 404) {
+        counter.textContent = '0';
+        return;
+      }
+      if (!response.ok) throw new Error('No se pudo consultar el contador');
+
+      const data = await response.json();
+      counter.textContent = data.count ?? '0';
+    } catch {
+      counter.textContent = '—';
+    }
+  }
+
+  window.addEventListener('load', () => {
+    window.setTimeout(loadVisitCount, 800);
+  });
 </script>
 
 </body>
