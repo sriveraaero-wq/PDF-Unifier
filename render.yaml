@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: pdf-unifier
+    runtime: docker
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: MAX_UPLOAD_MB
+        value: "50"
+      - key: MAX_FILES
+        value: "20"
