@@ -1,1 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Unifier</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+      --radius: 12px;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--primary), #7c3aed);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    header p {
+      color: var(--muted);
+      margin-top: 0.5rem;
+    }
+
+    main {
+      width: 100%;
+      max-width: 760px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* ── Drop Zone ── */
+    .drop-zone {
+      border: 2.5px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      background: var(--surface);
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+    .drop-zone.drag-over {
+      border-color: var(--primary);
+      background: #eef2ff;
+    }
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .drop-zone-icon { font-size: 3rem; line-height: 1; }
+    .drop-zone h2 { font-size: 1.15rem; font-weight: 600; margin-top: 0.75rem; }
+    .drop-zone p  { color: var(--muted); font-size: 0.875rem; margin-top: 0.4rem; }
+    .drop-zone .formats {
+      margin-top: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      justify-content: center;
+    }
+    .badge {
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.2rem 0.65rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    /* ── File List ── */
+    .file-list-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: none;
+    }
+    .file-list-card.has-files { display: block; }
+
+    .file-list-header {
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .file-list-header h3 { font-size: 0.95rem; font-weight: 600; }
+    .btn-clear {
+      background: none;
+      border: none;
+      color: var(--danger);
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+    .btn-clear:hover { background: #fef2f2; }
+
+    .file-list { list-style: none; }
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      cursor: grab;
+      transition: background 0.15s;
+      user-select: none;
+    }
+    .file-item:last-child { border-bottom: none; }
+    .file-item:hover { background: #f8fafc; }
+    .file-item.dragging { opacity: 0.4; background: #f1f5f9; }
+    .file-item.drag-target { border-top: 2px solid var(--primary); }
+
+    .file-icon { font-size: 1.5rem; flex-shrink: 0; }
+    .file-info { flex: 1; min-width: 0; }
+    .file-name { font-size: 0.9rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-size { font-size: 0.75rem; color: var(--muted); }
+    .drag-handle { color: #cbd5e1; font-size: 1.1rem; cursor: grab; }
+    .btn-remove {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0.3rem;
+      border-radius: 6px;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+    .btn-remove:hover { color: var(--danger); }
+
+    /* ── Options ── */
+    .options-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .options-card label { font-size: 0.9rem; font-weight: 500; white-space: nowrap; }
+    .options-card input[type="text"] {
+      flex: 1;
+      min-width: 180px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.55rem 0.85rem;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .options-card input[type="text"]:focus { border-color: var(--primary); }
+
+    /* ── Actions ── */
+    .actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.7rem 1.75rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* ── Progress / Status ── */
+    .status-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      display: none;
+      align-items: center;
+      gap: 1rem;
+    }
+    .status-card.visible { display: flex; }
+    .spinner {
+      width: 24px; height: 24px;
+      border: 3px solid #e2e8f0;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .status-text { font-size: 0.9rem; }
+
+    .alert {
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      font-size: 0.9rem;
+      display: none;
+    }
+    .alert.visible { display: block; }
+    .alert.error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+    .alert.success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+
+    footer {
+      margin-top: 3rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="drop-zone-icon">📄</div>
+  <h1>PDF Unifier</h1>
+  <p>Une varios archivos en un solo PDF — PDFs, imágenes, Word, Excel y PowerPoint.</p>
+</header>
+
+<main>
+
+  <!-- Drop Zone -->
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" multiple
+      accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.tif,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx" />
+    <div class="drop-zone-icon">☁️</div>
+    <h2>Arrastra tus archivos aquí</h2>
+    <p>o haz clic para seleccionarlos</p>
+    <div class="formats">
+      <span class="badge">PDF</span>
+      <span class="badge">JPG / PNG</span>
+      <span class="badge">GIF / BMP / TIFF / WEBP</span>
+      <span class="badge">Word</span>
+      <span class="badge">Excel</span>
+      <span class="badge">PowerPoint</span>
+    </div>
+  </div>
+
+  <!-- File List -->
+  <div class="file-list-card" id="fileListCard">
+    <div class="file-list-header">
+      <h3>Archivos (<span id="fileCount">0</span>) — arrastra para reordenar</h3>
+      <button class="btn-clear" onclick="clearAll()">Limpiar todo</button>
+    </div>
+    <ul class="file-list" id="fileList"></ul>
+  </div>
+
+  <!-- Options -->
+  <div class="options-card">
+    <label for="outputName">Nombre del archivo:</label>
+    <input type="text" id="outputName" placeholder="documento_unificado" value="documento_unificado" />
+  </div>
+
+  <!-- Actions -->
+  <div class="actions">
+    <button class="btn-primary" id="mergeBtn" onclick="mergeFiles()" disabled>
+      <span>🔗</span> Unificar PDF
+    </button>
+  </div>
+
+  <!-- Status -->
+  <div class="status-card" id="statusCard">
+    <div class="spinner"></div>
+    <div class="status-text">Procesando archivos, por favor espera…</div>
+  </div>
+
+  <!-- Alerts -->
+  <div class="alert error" id="errorAlert"></div>
+  <div class="alert success" id="successAlert"></div>
+
+</main>
+
+<footer>PDF Unifier · Archivos temporales eliminados automáticamente · Máx. {{ max_upload_mb }} MB / {{ max_files }} archivos</footer>
+
+<script>
+  // ─── Estado ───────────────────────────────────────────────────────────────
+  let fileList = [];   // Array de { id, file }
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function fileIcon(name) {
+    const ext = name.split('.').pop().toLowerCase();
+    const map = {
+      pdf: '📕', jpg: '🖼️', jpeg: '🖼️', png: '🖼️', gif: '🖼️',
+      bmp: '🖼️', tiff: '🖼️', tif: '🖼️', webp: '🖼️',
+      doc: '📝', docx: '📝', xls: '📊', xlsx: '📊', ppt: '📊', pptx: '📊'
+    };
+    return map[ext] || '📄';
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>'"]/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    })[char]);
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('errorAlert');
+    el.textContent = '❌ ' + msg;
+    el.classList.add('visible');
+    document.getElementById('successAlert').classList.remove('visible');
+  }
+
+  function showSuccess(msg) {
+    const el = document.getElementById('successAlert');
+    el.textContent = '✅ ' + msg;
+    el.classList.add('visible');
+    document.getElementById('errorAlert').classList.remove('visible');
+  }
+
+  function hideAlerts() {
+    document.getElementById('errorAlert').classList.remove('visible');
+    document.getElementById('successAlert').classList.remove('visible');
+  }
+
+  // ─── Agregar archivos ──────────────────────────────────────────────────────
+  function addFiles(newFiles) {
+    for (const file of newFiles) {
+      // Evitar duplicados por nombre+tamaño
+      const dup = fileList.some(f => f.file.name === file.name && f.file.size === file.size);
+      if (!dup) {
+        fileList.push({ id: crypto.randomUUID(), file });
+      }
+    }
+    renderList();
+  }
+
+  function clearAll() {
+    fileList = [];
+    document.getElementById('fileInput').value = '';
+    renderList();
+    hideAlerts();
+  }
+
+  function removeFile(id) {
+    fileList = fileList.filter(f => f.id !== id);
+    renderList();
+  }
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+  function renderList() {
+    const ul = document.getElementById('fileList');
+    const card = document.getElementById('fileListCard');
+    const mergeBtn = document.getElementById('mergeBtn');
+    const countEl = document.getElementById('fileCount');
+
+    countEl.textContent = fileList.length;
+    mergeBtn.disabled = fileList.length === 0;
+    card.classList.toggle('has-files', fileList.length > 0);
+
+    ul.innerHTML = '';
+    fileList.forEach(({ id, file }) => {
+      const safeName = escapeHtml(file.name);
+      const li = document.createElement('li');
+      li.className = 'file-item';
+      li.draggable = true;
+      li.dataset.id = id;
+      li.innerHTML = `
+        <span class="drag-handle" title="Arrastra para reordenar">⠿</span>
+        <span class="file-icon">${fileIcon(file.name)}</span>
+        <div class="file-info">
+          <div class="file-name" title="${safeName}">${safeName}</div>
+          <div class="file-size">${formatBytes(file.size)}</div>
+        </div>
+        <button class="btn-remove" title="Quitar" onclick="removeFile('${id}')">✕</button>
+      `;
+
+      // Drag-to-reorder events
+      li.addEventListener('dragstart', onDragStart);
+      li.addEventListener('dragover', onDragOver);
+      li.addEventListener('drop', onDrop);
+      li.addEventListener('dragend', onDragEnd);
+
+      ul.appendChild(li);
+    });
+  }
+
+  // ─── Drag & Drop (reorder list) ───────────────────────────────────────────
+  let dragSrcId = null;
+
+  function onDragStart(e) {
+    dragSrcId = e.currentTarget.dataset.id;
+    e.currentTarget.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  }
+  function onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.file-item').forEach(el => el.classList.remove('drag-target'));
+    e.currentTarget.classList.add('drag-target');
+  }
+  function onDrop(e) {
+    e.preventDefault();
+    const targetId = e.currentTarget.dataset.id;
+    if (!dragSrcId || dragSrcId === targetId) return;
+    const srcIdx = fileList.findIndex(f => f.id === dragSrcId);
+    const tgtIdx = fileList.findIndex(f => f.id === targetId);
+    const [item] = fileList.splice(srcIdx, 1);
+    fileList.splice(tgtIdx, 0, item);
+    renderList();
+  }
+  function onDragEnd(e) {
+    document.querySelectorAll('.file-item').forEach(el => {
+      el.classList.remove('dragging', 'drag-target');
+    });
+    dragSrcId = null;
+  }
+
+  // ─── Drop Zone (file input) ────────────────────────────────────────────────
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+
+  fileInput.addEventListener('change', () => addFiles(Array.from(fileInput.files)));
+
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    addFiles(Array.from(e.dataTransfer.files));
+  });
+
+  // ─── Merge ────────────────────────────────────────────────────────────────
+  async function mergeFiles() {
+    if (fileList.length === 0) return;
+
+    hideAlerts();
+    const statusCard = document.getElementById('statusCard');
+    const mergeBtn = document.getElementById('mergeBtn');
+
+    statusCard.classList.add('visible');
+    mergeBtn.disabled = true;
+
+    try {
+      const formData = new FormData();
+      for (const { file } of fileList) {
+        formData.append('files', file, file.name);
+      }
+      const outputName = document.getElementById('outputName').value.trim() || 'documento_unificado';
+      formData.append('output_name', outputName);
+
+      const response = await fetch('/merge', { method: 'POST', body: formData });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `Error del servidor: ${response.status}`);
+      }
+
+      // Descargar el PDF resultante
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (outputName.endsWith('.pdf') ? outputName : outputName + '.pdf');
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      showSuccess(`¡Listo! Tu PDF "${a.download}" se ha descargado.`);
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      statusCard.classList.remove('visible');
+      mergeBtn.disabled = fileList.length === 0;
+    }
+  }
+</script>
+
+</body>
+</html>
